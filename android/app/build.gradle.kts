@@ -1,0 +1,48 @@
+// android/app/build.gradle.kts
+
+plugins {
+    id("com.android.application")
+    id("kotlin-android")
+    id("dev.flutter.flutter-gradle-plugin")
+    // Do not apply google services here with version; we apply plugin via apply(...) below
+}
+
+android {
+    namespace = "com.example.vayu_app"
+    compileSdk = flutter.compileSdkVersion
+    ndkVersion = flutter.ndkVersion
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    kotlinOptions {
+        jvmTarget = JavaVersion.VERSION_17.toString()
+    }
+
+    defaultConfig {
+        applicationId = "com.example.vayu_app"
+
+        // Firebase requires minSdk >= 21 for some features
+        minSdk = flutter.minSdkVersion
+
+        targetSdk = flutter.targetSdkVersion
+        versionCode = flutter.versionCode
+        versionName = flutter.versionName
+    }
+
+    buildTypes {
+        getByName("release") {
+            // using debug signing for development; replace with proper signing for production
+            signingConfig = signingConfigs.getByName("debug")
+        }
+    }
+}
+
+flutter {
+    source = "../.."
+}
+
+// Apply Google services plugin to integrate google-services.json
+apply(plugin = "com.google.gms.google-services")
