@@ -4,7 +4,6 @@ plugins {
     id("com.android.application")
     id("kotlin-android")
     id("dev.flutter.flutter-gradle-plugin")
-    // Do not apply google services here with version; we apply plugin via apply(...) below
 }
 
 android {
@@ -24,7 +23,6 @@ android {
     defaultConfig {
         applicationId = "com.example.vayu_app"
 
-        // Firebase requires minSdk >= 21 for some features
         minSdk = flutter.minSdkVersion
 
         targetSdk = flutter.targetSdkVersion
@@ -44,5 +42,3 @@ flutter {
     source = "../.."
 }
 
-// Apply Google services plugin to integrate google-services.json
-apply(plugin = "com.google.gms.google-services")

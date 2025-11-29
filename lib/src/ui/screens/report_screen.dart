@@ -3,10 +3,12 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../services/geolocation_service.dart';
 import '../../services/waqi_api_service.dart';
 import '../../services/aqi_history_store.dart';
 import '../../models/air_quality.dart';
+import '../widgets/personalized_report_card.dart';
 
 class ReportScreen extends StatefulWidget {
   const ReportScreen({super.key});
@@ -147,7 +149,7 @@ class _ReportScreenState extends State<ReportScreen>
         }
       });
 
-      // *** NEW: store the fetched report so InsightsScreen receives it ***
+      // store the fetched report so InsightsScreen receives it
       AqiHistoryStore.instance.addReport(report);
 
       _animCtrl.forward(from: 0.0);
@@ -164,7 +166,6 @@ class _ReportScreenState extends State<ReportScreen>
     }
   }
 
-  // FIX: Ensure this method **exists**
   Future<void> _searchByCity() async {
     final ctrl = TextEditingController();
 
@@ -208,7 +209,7 @@ class _ReportScreenState extends State<ReportScreen>
         _components = {..._components, ...parsed};
       });
 
-      // *** NEW: save into history so Insights picks it up ***
+      // save into history so Insights picks it up
       AqiHistoryStore.instance.addReport(report);
 
       _animCtrl.forward(from: 0);
@@ -221,7 +222,7 @@ class _ReportScreenState extends State<ReportScreen>
         SnackBar(content: Text("Search error: $e")),
       );
     } finally {
-      setState(() => _fetchingAqi = false);
+      if (mounted) setState(() => _fetchingAqi = false);
     }
   }
 
@@ -263,7 +264,7 @@ class _ReportScreenState extends State<ReportScreen>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // ---------------- FIXED HEADER ROW ----------------
+                  // header row
                   Row(
                     children: [
                       Expanded(
@@ -316,7 +317,7 @@ class _ReportScreenState extends State<ReportScreen>
 
                       const SizedBox(width: 4),
 
-                      // search button FIXED
+                      // search
                       IconButton(
                         iconSize: 20,
                         padding: EdgeInsets.zero,
@@ -358,7 +359,7 @@ class _ReportScreenState extends State<ReportScreen>
 
                   const SizedBox(height: 16),
 
-                  // ---------- Pollutants horizontal scroll FIXED ----------
+                  // pollutants horizontal
                   SingleChildScrollView(
                     scrollDirection: Axis.horizontal,
                     padding: const EdgeInsets.only(right: 8),
@@ -394,7 +395,7 @@ class _ReportScreenState extends State<ReportScreen>
 
             const SizedBox(height: 24),
 
-            // Pollutant cards
+            // pollutant cards
             ..._components.entries.map(
               (e) {
                 final pct = (e.value / 500).clamp(0.0, 1.0);
@@ -453,7 +454,12 @@ class _ReportScreenState extends State<ReportScreen>
               },
             ),
 
-            const SizedBox(height: 24),
+            const SizedBox(height: 16),
+
+            // personalized card (uses SharedPreferences profile)
+            PersonalizedReportCard(aqi: _aqi.toInt()),
+
+            const SizedBox(height: 12),
 
             Row(
               children: [

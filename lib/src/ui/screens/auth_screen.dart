@@ -6,13 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-// Firebase packages (used if Firebase is initialized)
-import 'package:firebase_core/firebase_core.dart' show Firebase;
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 
-// Import the auth service we added
-import '../../services/auth_service.dart';
 
 class AuthScreen extends StatefulWidget {
   const AuthScreen({super.key});
@@ -26,17 +20,14 @@ enum AuthMode { login, signup }
 class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
   AuthMode _mode = AuthMode.login;
 
-  // form
   final _formKey = GlobalKey<FormState>();
   final _nameCtrl = TextEditingController();
   final _emailCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
 
-  // loading state
   bool _loading = false;
   bool _obscure = true;
 
-  // animations
   late final AnimationController _logoController;
   late final AnimationController _blobController;
   late final Animation<double> _logoScale;
@@ -67,61 +58,37 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _loading = true);
+
+    final prefs = await SharedPreferences.getInstance();
     final email = _emailCtrl.text.trim();
-    final password = _passwordCtrl.text;
+    final password = _passwordCtrl.text.trim();
     final name = _nameCtrl.text.trim();
 
     try {
-      final auth = FirebaseAuth.instance;
-      if (_mode == AuthMode.signup) {
-        // Try Firebase create user
-        final cred = await auth.createUserWithEmailAndPassword(email: email, password: password);
-        final uid = cred.user?.uid;
-        if (uid != null) {
-          // create a minimal Firestore user doc
-          await FirebaseFirestore.instance.collection('users').doc(uid).set({
-            'name': name,
-            'email': email,
-            'profileCompleted': false,
-            'createdAt': FieldValue.serverTimestamp(),
-          });
-        }
-        // navigate to profile to complete details
-        if (!mounted) return;
-        Navigator.of(context).pushReplacementNamed('/profile');
-      } else {
-        // Login mode
-        final cred = await auth.signInWithEmailAndPassword(email: email, password: password);
-        final uid = cred.user?.uid;
-        bool profileDone = true;
-        if (uid != null) {
-          final doc = await FirebaseFirestore.instance.collection('users').doc(uid).get().catchError((_) => null);
-          if (doc != null && doc.exists) {
-            final data = doc.data();
-            profileDone = data?['profileCompleted'] == true;
-          }
-        }
-        if (!mounted) return;
-        Navigator.of(context).pushReplacementNamed(profileDone ? '/home' : '/profile');
-      }
-    } catch (e) {
-      // If Firebase not configured or fails, fallback to SharedPreferences simple flow.
-      // ignore: avoid_print
-      print('Firebase auth error, falling back to local: $e');
-      final prefs = await SharedPreferences.getInstance();
       if (_mode == AuthMode.signup) {
         await prefs.setString('local_email', email);
         await prefs.setString('local_name', name);
+        await prefs.setString('local_password', password);
         await prefs.setBool('local_profile_completed', false);
         await prefs.setBool('loggedIn', true);
+
         if (!mounted) return;
         Navigator.of(context).pushReplacementNamed('/profile');
       } else {
-        // simple local login success
-        await prefs.setBool('loggedIn', true);
-        final done = prefs.getBool('local_profile_completed') ?? true;
-        if (!mounted) return;
-        Navigator.of(context).pushReplacementNamed(done ? '/home' : '/profile');
+        final storedEmail = prefs.getString('local_email');
+        final storedPass = prefs.getString('local_password');
+
+        if (storedEmail == email && storedPass == password) {
+          await prefs.setBool('loggedIn', true);
+          final done = prefs.getBool('local_profile_completed') ?? true;
+          if (!mounted) return;
+          Navigator.of(context).pushReplacementNamed(done ? '/home' : '/profile');
+        } else {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("Incorrect email or password")),
+          );
+        }
       }
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -338,67 +305,14 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
     );
   }
 
-  // Updated _socialButton: Google uses AuthService.signInWithGoogle()
+  // Social buttons are placeholders (no Firebase)
   Widget _socialButton(IconData icon, String label) {
     return OutlinedButton.icon(
-      onPressed: () async {
-        if (label.toLowerCase() == 'google') {
-          // Ensure Firebase is initialized (helps avoid "[core/no-app] No Firebase App '[DEFAULT]' has been created" on web)
-          if (Firebase.apps.isEmpty) {
-            if (!mounted) return;
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                  content: Text(
-                      'Firebase is not initialized. Make sure lib/firebase_options.dart exists and Firebase.initializeApp() is called.')),
-            );
-            return;
-          }
-
-          // Attempt google sign-in
-          if (!mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Signing in with Google...')),
-          );
-          try {
-            final cred = await AuthService.signInWithGoogle();
-            if (cred == null) {
-              // user cancelled
-              if (!mounted) return;
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Google sign-in cancelled')),
-              );
-              return;
-            }
-            // success — navigate (replace with your app flow)
-            final uid = cred.user?.uid;
-            debugPrint('Google sign-in success: ${cred.user?.email} (uid=$uid)');
-
-            // Ensure a Firestore user doc exists for this user through AuthService
-            try {
-              await AuthService.ensureUserDoc(cred.user);
-            } catch (e) {
-              // ignore
-            }
-
-            if (!mounted) return;
-            Navigator.of(context).pushReplacementNamed('/home');
-          } catch (e) {
-            debugPrint('Google sign-in error: $e');
-
-            // Helpful hint for web: popup blocked or config missing
-            if (!mounted) return;
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Google sign-in failed: $e\nTip: allow popups for localhost and ensure Firebase is configured.')),
-            );
-          }
-        } else if (label.toLowerCase() == 'apple') {
-          // placeholder — implement Apple ID sign-in if desired
-          if (!mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Apple sign-in not implemented')));
-        } else {
-          if (!mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$label sign-in not implemented')));
-        }
+      onPressed: () {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('$label sign-in not available')),
+        );
       },
       icon: Icon(icon, color: Colors.white),
       label: Text(label, style: const TextStyle(color: Colors.white)),

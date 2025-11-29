@@ -1,9 +1,5 @@
 // android/build.gradle.kts
-
-plugins {
-    // Use plugins DSL to provide the google services plugin (apply false)
-    id("com.google.gms.google-services") version "4.4.4" apply false
-}
+// Use old-style buildscript/classpath approach to avoid mixing plugin DSLs.
 
 buildscript {
     repositories {
@@ -14,9 +10,6 @@ buildscript {
         // Android Gradle plugin
         classpath("com.android.tools.build:gradle:8.0.2")
 
-        // Ensure google-services on the classpath matches the plugins {} declaration (4.4.4)
-        // This line resolves the "plugin already on the classpath with a different version" issue.
-        classpath("com.google.gms:google-services:4.4.4")
     }
 }
 

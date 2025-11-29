@@ -3,10 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../services/aqi_history_store.dart';
 
-// Firebase (optional)
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-
 class ProfileScreen extends StatefulWidget {
   final VoidCallback? onSignOut;
   const ProfileScreen({super.key, this.onSignOut});
@@ -46,34 +42,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _loadProfile() async {
-    // Try Firebase user first
-    try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user != null) {
-        final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
-        if (doc.exists) {
-          final data = doc.data()!;
-          setState(() {
-            _name = data['name'] ?? _name;
-            _email = data['email'] ?? _email;
-            _age = (data['age'] is int) ? data['age'] as int : (data['age'] is String ? int.tryParse(data['age']) : _age);
-            _smoking = data['smoking'] == true;
-            _asthma = data['asthma'] == true;
-            _chronic = data['chronic'] == true;
-            _chronicDetails = data['chronicDetails'];
-            _gender = data['gender'];
-            _avatarUrl = data['avatarUrl'];
-            _nameController.text = _name;
-            _emailController.text = _email;
-            _ageController.text = _age?.toString() ?? '';
-            _chronicController.text = _chronicDetails ?? '';
-          });
-          return;
-        }
-      }
-    } catch (_) {}
-
-    // Fallback to SharedPreferences
     final prefs = await SharedPreferences.getInstance();
     setState(() {
       _name = prefs.getString('local_name') ?? _name;
@@ -84,6 +52,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
       _chronic = prefs.getBool('local_chronic') ?? _chronic;
       _chronicDetails = prefs.getString('local_chronicDetails');
       _gender = prefs.getString('local_gender');
+      final storedAvatar = prefs.getString('local_avatarUrl');
+      _avatarUrl = (storedAvatar == null || storedAvatar.isEmpty) ? null : storedAvatar;
       _nameController.text = _name;
       _emailController.text = _email;
       _ageController.text = _age?.toString() ?? '';
@@ -162,46 +132,30 @@ class _ProfileScreenState extends State<ProfileScreen> {
       _editing = false;
     });
 
-    // Try saving to Firestore for the authenticated user
-    try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user != null) {
-        await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
-          'name': _name,
-          'email': _email,
-          'age': _age,
-          'smoking': _smoking,
-          'asthma': _asthma,
-          'chronic': _chronic,
-          'chronicDetails': _chronicDetails,
-          'gender': _gender,
-          'avatarUrl': _avatarUrl,
-          'profileCompleted': true,
-          'updatedAt': FieldValue.serverTimestamp(),
-        }, SetOptions(merge: true));
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Profile saved (cloud)')));
-        return;
-      }
-    } catch (e) {
-      // ignore and fallback to prefs
-      // ignore: avoid_print
-      print('Firestore save error: $e');
-    }
-
-    // Persist locally
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('local_name', _name);
     await prefs.setString('local_email', _email);
-    if (_age != null) await prefs.setInt('local_age', _age!);
+    if (_age != null) {
+      await prefs.setInt('local_age', _age!);
+    } else {
+      await prefs.remove('local_age');
+    }
     await prefs.setBool('local_smoking', _smoking);
     await prefs.setBool('local_asthma', _asthma);
     await prefs.setBool('local_chronic', _chronic);
     await prefs.setString('local_chronicDetails', _chronicDetails ?? '');
-    if (_gender != null) await prefs.setString('local_gender', _gender!);
+    if (_gender != null) {
+      await prefs.setString('local_gender', _gender!);
+    } else {
+      await prefs.remove('local_gender');
+    }
     await prefs.setString('local_avatarUrl', _avatarUrl ?? '');
     await prefs.setBool('local_profile_completed', true);
 
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Profile saved (local)')));
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Profile saved')));
+
+    if (!mounted) return;
+    Navigator.of(context).pushReplacementNamed('/home');
   }
 
   Future<void> _confirmClearHistory() async {
@@ -249,6 +203,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return Wrap(spacing: 8, runSpacing: 6, children: chips);
   }
 
+  Future<void> _signOutLocal() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('loggedIn', false);
+
+    if (widget.onSignOut != null) widget.onSignOut!();
+
+    if (!mounted) return;
+    Navigator.of(context).pushReplacementNamed('/auth');
+  }
+
   @override
   Widget build(BuildContext context) {
     final avatar = _avatarUrl != null && _avatarUrl!.isNotEmpty
@@ -271,20 +235,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           IconButton(
             tooltip: 'Sign out',
             icon: const Icon(Icons.logout),
-            onPressed: () async {
-              // Sign out from firebase if present
-              try {
-                await FirebaseAuth.instance.signOut();
-              } catch (_) {}
-              // Also clear local loggedIn
-              final prefs = await SharedPreferences.getInstance();
-              await prefs.setBool('loggedIn', false);
-
-              if (widget.onSignOut != null) widget.onSignOut!();
-              // navigate back to auth
-              if (!mounted) return;
-              Navigator.of(context).pushReplacementNamed('/auth');
-            },
+            onPressed: _signOutLocal,
           ),
         ],
       ),

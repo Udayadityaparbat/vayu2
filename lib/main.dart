@@ -1,31 +1,30 @@
 // lib/main.dart
 import 'package:flutter/material.dart';
-import 'package:firebase_core/firebase_core.dart';
-import 'firebase_options.dart'; // generated manually or by flutterfire
-
+import 'package:shared_preferences/shared_preferences.dart';
 import 'src/ui/screens/auth_screen.dart';
 import 'src/ui/screens/profile_screen.dart';
 import 'src/ui/screens/report_screen.dart';
 import 'src/ui/screens/insights_screen.dart';
 import 'src/ui/screens/explore_screen.dart';
 
-Future<void> main(List<String> args) async {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  try {
-    await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
-    );
-  } catch (e) {
-    // Keep app running (useful for local dev fallback)
-    // ignore: avoid_print
-    print('Firebase init warning (continuing): $e');
+
+  final prefs = await SharedPreferences.getInstance();
+  final loggedIn = prefs.getBool('loggedIn') ?? false;
+  final profileDone = prefs.getBool('local_profile_completed') ?? false;
+
+  String initialRoute = '/auth';
+  if (loggedIn) {
+    initialRoute = profileDone ? '/home' : '/profile';
   }
 
-  runApp(const VayuApp());
+  runApp(VayuApp(initialRoute: initialRoute));
 }
 
 class VayuApp extends StatelessWidget {
-  const VayuApp({super.key});
+  final String initialRoute;
+  const VayuApp({super.key, required this.initialRoute});
 
   @override
   Widget build(BuildContext context) {
@@ -36,11 +35,11 @@ class VayuApp extends StatelessWidget {
         primarySwatch: Colors.indigo,
         useMaterial3: true,
       ),
-      initialRoute: '/auth',
+      initialRoute: initialRoute,
       routes: {
-        '/auth': (_) => const AuthScreen(),
-        '/profile': (_) => const ProfileScreen(),
-        '/home': (_) => const MainShell(),
+        '/auth': (context) => const AuthScreen(),
+        '/profile': (context) => const ProfileScreen(),
+        '/home': (context) => const MainShell(),
       },
     );
   }
@@ -56,7 +55,7 @@ class MainShell extends StatefulWidget {
 class _MainShellState extends State<MainShell> {
   int _selectedIndex = 0;
 
-  final List<Widget> _pages = const <Widget>[
+  static const List<Widget> _pages = <Widget>[
     ReportScreen(),
     InsightsScreen(),
     ExploreScreen(),
