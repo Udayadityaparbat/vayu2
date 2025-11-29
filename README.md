@@ -1,4 +1,4 @@
-VAAYU – Agentic AI Health Advisory System (README.TXT)
+VAAYU – Agentic AI Health Advisory System
 
 Vaayu is a cross-platform (Flutter mobile + web) AI-powered health advisory application that helps users take preventive actions against air-pollution-related health problems.
 Vaayu uses real-time air quality information, location, and a user’s basic health profile to generate simple, actionable AI-based recommendations.
@@ -135,6 +135,3 @@ AI Advisory Engine:
 - Saanidhya Sharma
 - Riya Priyadarshini
 
-----------------------------------------------------------------------
-END OF README
-----------------------------------------------------------------------
